@@ -6,7 +6,6 @@ import datetime
 import numpy
 import nltk
 import matplotlib.pyplot as plot
-# test comment for git stuff
 
 WIKIPEDIA_XML_FNAME = 'simplewiki-latest-pages-articles.xml'
 print 'starting'
