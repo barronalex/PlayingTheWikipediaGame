@@ -38,14 +38,17 @@ def runkmeans(examples, K, maxIters):
     centroids = random.sample(examples,K)
     z = [0 for x in range(0, len(examples))]
     for k in range(0,maxIters):
+        print "iter: ", k
         for i in range(0,len(examples)):
             curEx = examples[i] 
             z[i] = centroids.index(min(centroids, key=lambda cen: norm2(incrementRet(curEx, -1, cen))))
         lastLoss = loss()
+        print "E step"
         for i in range(0,len(centroids)):
             pointsInCluster = [examples[j] for j in range(0,len(z)) if z[j] == i]
             if len(pointsInCluster) > 0:
                 centroids[i] = sumVecs(pointsInCluster)
+        print "M step"
         if loss() == lastLoss:
             break
     return (centroids, z, loss())
