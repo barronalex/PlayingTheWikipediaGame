@@ -1,9 +1,11 @@
-import os.path
 import re
 import xml.etree.cElementTree as etree
 import util
 import random
 import datetime
+import numpy
+import nltk
+import matplotlib.pyplot as plot
 
 
 WIKIPEDIA_XML_FNAME = 'simplewiki-latest-pages-articles.xml'
