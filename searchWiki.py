@@ -1,17 +1,25 @@
-import re
-import xml.etree.cElementTree as etree
 import ucsUtil
+import kmeans
+
 import random
 import datetime
+import re
+import os.path
+
+import xml.etree.cElementTree as etree
+import cPickle
+
 import numpy
 import matplotlib.pyplot as plot
 
-import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from nltk.stem.snowball import SnowballStemmer
 
+
 WIKIPEDIA_XML_FNAME = 'simplewiki-latest-pages-articles.xml'
+PICKLE_FNAME = 'pages.pickle'
+
 MEDIA_WIKI_PREFIX = '{http://www.mediawiki.org/xml/export-0.10/}'
 REDIRECT_STR1 = '#REDIRECT'
 REDIRECT_STR2 = '#redirect'
@@ -27,18 +35,24 @@ stemmer = SnowballStemmer('english')
 # get the tree from the XML file
 def init_tree():
     print 'starting'
-    tree = etree.parse(WIKIPEDIA_XML_FNAME)
+    if os.path.exists(PICKLE_FNAME):
+        print 'loading from pickle'
+        pages = cPickle.load(open(PICKLE_FNAME, 'rb'))
+    else:
+        print 'loading from xml'
+        tree = etree.parse(WIKIPEDIA_XML_FNAME)
+        root = tree.getroot()
+        root = root[1:len(root)]
+        pages = {}
+        for page in root:
+            title = page.find(MEDIA_WIKI_PREFIX + 'title')
+            revision = page.find(MEDIA_WIKI_PREFIX + 'revision')
+            text = revision.find(MEDIA_WIKI_PREFIX + 'text')
+            if text is not None and title is not None:
+                pages[title.text] = (text.text, None)
+        print 'dumping to pickle'
+        cPickle.dump(pages, open(PICKLE_FNAME, 'wb'))
     print 'wikipedia loaded'
-    root = tree.getroot()
-
-    root = root[1:len(root)]
-    pages = {}
-    for page in root:
-        title = page.find(MEDIA_WIKI_PREFIX + 'title')
-        revision = page.find(MEDIA_WIKI_PREFIX + 'revision')
-        text = revision.find(MEDIA_WIKI_PREFIX + 'text')
-        if text is not None and title is not None:
-            pages[title.text] = (text.text, None)
 
     return pages
 
@@ -128,3 +142,4 @@ def perform_ucs():
     print 'percent with paths: ', float(num_pith_paths), '%'
     print 'av time: ', float(total_time)/100
 
+kmeans.runkmeans(pages, 10, 300)

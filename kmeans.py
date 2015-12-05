@@ -1,4 +1,11 @@
 import random
+import sklearn
+
+
+def runkmeans_sklearn(examples, K, maxIters):
+    kmeans = sklearn.cluster.KMeans(8, init='k-means++', n_init=5)
+
+
 def runkmeans(examples, K, maxIters):
     def increment(d1, scale, d2):
         for f, v in d2.items():
