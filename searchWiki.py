@@ -3,18 +3,25 @@ import xml.etree.cElementTree as etree
 import ucsUtil
 import random
 import datetime
-import nltk
 import numpy
 import matplotlib.pyplot as plot
 
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import RegexpTokenizer
+from nltk.stem.snowball import SnowballStemmer
 
 WIKIPEDIA_XML_FNAME = 'simplewiki-latest-pages-articles.xml'
 MEDIA_WIKI_PREFIX = '{http://www.mediawiki.org/xml/export-0.10/}'
 REDIRECT_STR1 = '#REDIRECT'
 REDIRECT_STR2 = '#redirect'
 
-
 GOAL_ARTICLE = 'Stanford'
+
+
+stop_words = set(stopwords.words('english'))
+tokenizer = RegexpTokenizer(r'\w+')
+stemmer = SnowballStemmer('english')
 
 
 # get the tree from the XML file
@@ -56,8 +63,20 @@ def get_links_from_text(pages, text):
     return links
 
 
-def extract_features(text):
-    return nltk.word_tokenize(text)
+def extract_features(text, links):
+    tokens = tokenizer.tokenize(text.lower())
+
+    unique_tokens = set([])
+    for token in tokens:
+        unique_tokens.add(stemmer.stem(token))
+
+    unique_tokens_no_sw = unique_tokens - stop_words
+
+    features = {token: 1 for token in unique_tokens_no_sw}
+    features['NUM_WORDS'] = len(tokens)
+    features['NUM_LINKS'] = len(links)
+
+    return features
 
 
 # convert the page array to a tuple (article text, links, features)
@@ -67,12 +86,12 @@ for i, (page, value) in enumerate(pages.iteritems()):
     val = value[0]
     links = get_links_from_text(pages, val)
     if not isinstance(val, basestring):
-        print 'err', val
-        features = []
+        features = {}
     else:
-        features = extract_features(val)
+        features = extract_features(val, links)
         if i % 1000 == 0:
-            print i
+            print 'i = ', i
+
     pages[page] = (val, links, features)
 print 'pages is setup'
 
