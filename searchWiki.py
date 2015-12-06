@@ -1,4 +1,4 @@
-import ucsUtil
+import ucs
 import classification
 import kmeans
 import pca
@@ -21,10 +21,13 @@ from nltk.stem.snowball import SnowballStemmer
 
 WIKIPEDIA_XML_FNAME = 'simplewiki-latest-pages-articles.xml'
 PICKLE_FNAME = 'pages.pickle'
+TRAINING_DATA_PICKLE_FNAME = 'training_data.pickle'
 
 MEDIA_WIKI_PREFIX = '{http://www.mediawiki.org/xml/export-0.10/}'
 REDIRECT_STR1 = '#REDIRECT'
 REDIRECT_STR2 = '#redirect'
+
+INFINITE_COST = 10000
 
 GOAL_ARTICLE = 'Stanford'
 
@@ -34,28 +37,14 @@ tokenizer = RegexpTokenizer(r'\w+')
 stemmer = SnowballStemmer('english')
 
 
-def set_up_links_and_features():
-    print 'total articles:', len(pages)
-    for i, (page, value) in enumerate(pages.iteritems()):
-        val = value[0]
-        links = get_links_from_text(pages, val)
-        if not isinstance(val, basestring):
-            features = {}
-        else:
-            features = extract_features(val, links)
-            if i % 1000 == 0:
-                print 'i = ', i
-        pages[page] = (val, links, features)
-
-
 # get the tree from the XML file
 def init_pages():
     print 'starting'
     if os.path.exists(PICKLE_FNAME):
-        print 'loading from pickle'
+        print 'loading pages from pickle'
         pages = cPickle.load(open(PICKLE_FNAME, 'rb'))
     else:
-        print 'loading from xml'
+        print 'loading pages from xml'
         tree = etree.parse(WIKIPEDIA_XML_FNAME)
         root = tree.getroot()
         root = root[1:len(root)]
@@ -73,6 +62,20 @@ def init_pages():
     print 'wikipedia loaded'
 
     return pages
+
+
+def set_up_links_and_features():
+    print 'total articles:', len(pages)
+    for i, (page, value) in enumerate(pages.iteritems()):
+        val = value[0]
+        links = get_links_from_text(pages, val)
+        if not isinstance(val, basestring):
+            features = {}
+        else:
+            features = extract_features(val, links)
+            if i % 1000 == 0:
+                print 'i = ', i
+        pages[page] = (val, links, features)
 
 
 def get_links_from_text(pages, text):
@@ -116,31 +119,31 @@ pages = init_pages()
 print 'pages is setup'
 
 
-def perform_ucs():
+def test_ucs(num_tests):
     total_states_explored = 0
     total_cost = 0
     num_pith_paths = 0
     total_time = 0
 
-    for i in range(0, 100):
+    for i in range(num_tests):
         start_article = random.sample(pages, 1)[0]
         print 'start article: ', start_article
         print 'goal article: ', GOAL_ARTICLE
         start_time = datetime.datetime.now()
-        search_prob = ucsUtil.SearchProblem(pages, start_article, GOAL_ARTICLE)
-        ucs = ucsUtil.UniformCostSearch(1)
-        ucs.solve(search_prob)
+        search_prob = ucs.SearchProblem(pages, start_article, GOAL_ARTICLE)
+        ucs_prob = ucs.UniformCostSearch(1)
+        ucs_prob.solve(search_prob)
         end_time = datetime.datetime.now()
         total_time += int((end_time - start_time).microseconds)
-        print ucs.actions
-        total_states_explored += ucs.numStatesExplored
-        if ucs.totalCost is None:
+        print ucs_prob.actions
+        total_states_explored += ucs_prob.numStatesExplored
+        if ucs_prob.totalCost is None:
             continue
-        total_cost += ucs.totalCost
+        total_cost += ucs_prob.totalCost
         num_pith_paths += 1
 
-        print ucs.totalCost
-        print ucs.numStatesExplored
+        print ucs_prob.totalCost
+        print ucs_prob.numStatesExplored
         print ''
 
     print 'av states explored: ', float(total_states_explored)/100
@@ -149,47 +152,87 @@ def perform_ucs():
     print 'av time: ', float(total_time)/100
 
 
-def learn_weights(num_training_examples):
+def train_model(num_training_examples):
     print 'generating training data'
+
+    if os.path.exists(TRAINING_DATA_PICKLE_FNAME):
+        print 'loading from pickle'
+        training_data = cPickle.load(open(TRAINING_DATA_PICKLE_FNAME, 'rb'))
+    else:
+        print 'generating with UCS'
+        training_data = {}
+
+        for i in range(num_training_examples):
+            if i % 10 == 0:
+                print 'generated', i, 'examples'
+            start_article = random.sample(pages, 1)[0]
+            search_prob = ucs.SearchProblem(pages, start_article, GOAL_ARTICLE)
+            ucs_prob = ucs.UniformCostSearch()
+            ucs_prob.solve(search_prob)
+
+            if ucs_prob.totalCost is None:
+                training_data[start_article] = INFINITE_COST
+                continue
+            num_actions = len(ucs_prob.actions)
+            for j, action in enumerate(ucs_prob.actions):
+                training_data[action] = num_actions - j
+
+        print 'pickling for future use'
+        cPickle.dump(pages, open(TRAINING_DATA_PICKLE_FNAME, 'wb'))
+
+    x = []
+    y = []
+    for key, val in training_data.iteritems():
+        x.append(pages[key][2])
+        y.append(val)
+
+    return classification.get_logistic_regression_model(x, y)
+
+
+def test_model(num_testing_examples, model):
+    print 'generating testing data'
+
     training_data = {}
-
-    for i in range(num_training_examples):
+    for i in range(num_testing_examples):
+        if i % 10 == 0:
+            print 'generated', i, 'examples'
         start_article = random.sample(pages, 1)[0]
-        search_prob = ucsUtil.SearchProblem(pages, start_article, GOAL_ARTICLE)
-        ucs = ucsUtil.UniformCostSearch(1)
-        ucs.solve(search_prob)
+        search_prob = ucs.SearchProblem(pages, start_article, GOAL_ARTICLE)
+        ucs_prob = ucs.UniformCostSearch()
+        ucs_prob.solve(search_prob)
 
-        if ucs.totalCost is None:
-            training_data[start_article] = float('inf')
+        if ucs_prob.totalCost is None:
+            training_data[start_article] = INFINITE_COST
             continue
-        num_actions = len(ucs.actions)
-        for j, action in enumerate(ucs.actions):
+        num_actions = len(ucs_prob.actions)
+        for j, action in enumerate(ucs_prob.actions):
             training_data[action] = num_actions - j
 
-    weights = []
-    for i in range(6):
-        x = []
-        y = []
-        for key, val in training_data:
-            x.append(pages[key][2])
-            y.append(val == i + 1)
-        weight = classification.logistic_regression(x, y)
-        weights.append(weight)
+    x = []
+    y = []
+    for key, val in training_data.iteritems():
+        x.append(pages[key][2])
+        y.append(val)
 
-    return weights
+    print 'applying model'
+    correct_classifications = classification.apply_logistic_regression_model(x, model)
+    count = float(0)
+    for i in range(len(y)):
+        if y[i] == correct_classifications[i]:
+            count += 1
 
-
-def cluster_data():
-    examples = [pages[page][2] for page in pages]
-
-    count = 0
-    assignments = []
-    for page in pages:
-        assignments.append((page, count))
-        count += 1
-
-    kmeans.runkmeans_sklearn(examples, 10)
+    print count / num_testing_examples, '%'
+    print count, 'of', num_testing_examples
+    return count / num_testing_examples
 
 
-cluster_data()
+def cluster_data(examples):
+    kmeansresults = kmeans.runkmeans_sklearn(examples)
+
+
+model = train_model(500)
+test_model(100, model)
+
+examples = [pages[page][2] for page in pages]
+cluster_data(examples)
 

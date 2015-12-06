@@ -1,11 +1,20 @@
-from sklearn import linear_model, datasets
+from sklearn.feature_extraction import DictVectorizer
+from sklearn import linear_model
 
 
-def logistic_regression(x, y):
+def get_logistic_regression_model(x, y):
+    print 'generating logistic model'
     logreg = linear_model.LogisticRegression(penalty='l2', dual=False, tol=0.0001, fit_intercept=True,
                                              intercept_scaling=1, solver='lbfgs', max_iter=100, multi_class='ovr',
-                                             verbose=True, warm_start=True, n_jobs=1)
-    t_x = logreg.transform(x)
-    logreg.fit(x)
+                                             verbose=True)
+    d = DictVectorizer()
+    t_x = d.fit_transform(x)
+    logreg.fit(t_x, y)
+    print "logistic model created"
     return logreg
+
+
+def apply_logistic_regression_model(x, model):
+    # t_x = model.transform(x)
+    return model.predict(x)
 

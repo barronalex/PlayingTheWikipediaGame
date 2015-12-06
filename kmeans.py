@@ -1,58 +1,23 @@
-import random
+import cPickle
 
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.cluster import KMeans
 
+NUM_K_VALUES = 10
+SPACING = 2
+KMEANS_PICKLE_FNAME = "kmeans_results.pickle"
 
-def runkmeans_sklearn(examples, K):
-    kmeans = KMeans(K, init='k-means++', n_init=1, verbose=True)
+
+def runkmeans_sklearn(examples):
     d = DictVectorizer()
     X = d.fit_transform(examples)
     print "sparse matrix created"
-    kmeans.fit(X)
+    results = {}
+    for k in range(1, NUM_K_VALUES + 1):
+        print "running kmeans with K = ", SPACING*k
+        kmeans = KMeans(SPACING*k, init='k-means++', n_init=5, verbose=True)
+        km = kmeans.fit(X)
+        results[SPACING*k] = km
+    cPickle.dump(results, open(KMEANS_PICKLE_FNAME, 'wb'))
+    return results
 
-
-def runkmeans(examples, K, maxIters):
-    def increment(d1, scale, d2):
-        for f, v in d2.items():
-            d1[f] = d1.get(f, 0) + v * scale
-    def norm2(vec):
-        norm = 0
-        for key in vec:
-            norm += vec[key]**2
-        return norm
-    def incrementRet(d1, scale, d2):
-        d3 = {}
-        for f,v in d1.items():
-            d3[f] = d1[f]
-        for f, v in d2.items():
-            d3[f] = d1.get(f, 0) + v * scale
-        return d3
-    def sumVecs(vecs):
-        result = {}
-        for vec in vecs:
-            scale = 1/float(len(vecs))
-            increment(result, scale, vec)
-        return result
-    def loss():
-        sumElems = [norm2(incrementRet(examples[i], -1, centroids[z[i]])) for i in range(0,len(examples))]
-        loss = float(0)
-        for x in sumElems:
-            loss += x
-        return loss
-    centroids = random.sample(examples,K)
-    z = [0 for x in range(0, len(examples))]
-    for k in range(0,maxIters):
-        print "iter: ", k
-        for i in range(0,len(examples)):
-            curEx = examples[i] 
-            z[i] = centroids.index(min(centroids, key=lambda cen: norm2(incrementRet(curEx, -1, cen))))
-        lastLoss = loss()
-        print "E step"
-        for i in range(0,len(centroids)):
-            pointsInCluster = [examples[j] for j in range(0,len(z)) if z[j] == i]
-            if len(pointsInCluster) > 0:
-                centroids[i] = sumVecs(pointsInCluster)
-        print "M step"
-        
-    return (centroids, z)
