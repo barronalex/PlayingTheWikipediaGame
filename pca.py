@@ -1,5 +1,5 @@
-import sklearn
+from sklearn.decomposition import PCA
 
 def run_pca():
-    pca = sklearn.decomposition.PCA()
+    pca = PCA()
 
