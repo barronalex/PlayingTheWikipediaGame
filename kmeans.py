@@ -2,8 +2,10 @@ import random
 import sklearn
 
 
-def runkmeans_sklearn(examples, K, maxIters):
-    kmeans = sklearn.cluster.KMeans(8, init='k-means++', n_init=5)
+def runkmeans_sklearn(examples, K):
+    kmeans = sklearn.cluster.KMeans(K, init='k-means++', n_init=1, verbose=True)
+    kmeans.fit(examples)
+
 
 def runkmeans(examples, K, maxIters):
     def increment(d1, scale, d2):

@@ -142,4 +142,4 @@ def perform_ucs():
     print 'percent with paths: ', float(num_pith_paths), '%'
     print 'av time: ', float(total_time)/100
 
-kmeans.runkmeans(pages, 10, 300)
+kmeans.runkmeans_sklearn(pages, 10)
