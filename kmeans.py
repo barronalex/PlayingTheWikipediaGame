@@ -6,7 +6,7 @@ from sklearn.cluster import KMeans
 NUM_K_VALUES = 10
 SPACING = 2
 
-def runkmeans_sklearn(examples, K):
+def runkmeans_sklearn(examples):
     d = DictVectorizer()
     X = d.fit_transform(examples)
     print "sparse matrix created"
