@@ -49,6 +49,5 @@ def runkmeans(examples, K, maxIters):
             if len(pointsInCluster) > 0:
                 centroids[i] = sumVecs(pointsInCluster)
         print "M step"
-        if loss() == lastLoss:
-            break
-    return (centroids, z, loss())
+        
+    return (centroids, z)
