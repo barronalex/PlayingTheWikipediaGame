@@ -62,22 +62,6 @@ def init_pages():
     print 'wikipedia loaded'
 
     return pages
-
-
-def set_up_links_and_features():
-    print 'total articles:', len(pages)
-    for i, (page, value) in enumerate(pages.iteritems()):
-        val = value[0]
-        links = get_links_from_text(pages, val)
-        if not isinstance(val, basestring):
-            features = {}
-        else:
-            features = extract_features(val, links)
-            if i % 1000 == 0:
-                print 'i = ', i
-        pages[page] = (val, links, features)
-
-
 def get_links_from_text(pages, text):
     links = []
     if text is None:
@@ -96,8 +80,6 @@ def get_links_from_text(pages, text):
                 continue
         links.append(potential_link)
     return links
-
-
 def extract_features(text, links):
     tokens = tokenizer.tokenize(text.lower())
 
@@ -112,6 +94,18 @@ def extract_features(text, links):
     features['NUM_LINKS'] = len(links)
 
     return features
+def set_up_links_and_features():
+    print 'total articles:', len(pages)
+    for i, (page, value) in enumerate(pages.iteritems()):
+        val = value[0]
+        links = get_links_from_text(pages, val)
+        if not isinstance(val, basestring):
+            features = {}
+        else:
+            features = extract_features(val, links)
+            if i % 1000 == 0:
+                print 'i = ', i
+        pages[page] = (val, links, features)
 
 
 # set up pages dictionary which contains {page title: (page text, links from page, feature dict)}
@@ -135,15 +129,12 @@ def test_ucs(num_tests):
         ucs_prob.solve(search_prob)
         end_time = datetime.datetime.now()
         total_time += int((end_time - start_time).microseconds)
-        print ucs_prob.actions
         total_states_explored += ucs_prob.numStatesExplored
         if ucs_prob.totalCost is None:
             continue
         total_cost += ucs_prob.totalCost
         num_pith_paths += 1
 
-        print ucs_prob.totalCost
-        print ucs_prob.numStatesExplored
         print ''
 
     print 'av states explored: ', float(total_states_explored)/100
@@ -152,12 +143,13 @@ def test_ucs(num_tests):
     print 'av time: ', float(total_time)/100
 
 
-def train_model(num_training_examples):
+def train_models(num_training_examples, methods):
     print 'generating training data'
 
-    if os.path.exists(TRAINING_DATA_PICKLE_FNAME):
+    fname = str(num_training_examples) + '.' + TRAINING_DATA_PICKLE_FNAME
+    if os.path.exists(fname):
         print 'loading from pickle'
-        training_data = cPickle.load(open(TRAINING_DATA_PICKLE_FNAME, 'rb'))
+        training_data = cPickle.load(open(fname, 'rb'))
     else:
         print 'generating with UCS'
         training_data = {}
@@ -174,11 +166,12 @@ def train_model(num_training_examples):
                 training_data[start_article] = INFINITE_COST
                 continue
             num_actions = len(ucs_prob.actions)
+            training_data[start_article] = num_actions
             for j, action in enumerate(ucs_prob.actions):
-                training_data[action] = num_actions - j
+                training_data[action] = num_actions - j - 1
 
         print 'pickling for future use'
-        cPickle.dump(training_data, open(TRAINING_DATA_PICKLE_FNAME, 'wb'))
+        cPickle.dump(training_data, open(fname, 'wb'))
 
     x = []
     y = []
@@ -186,10 +179,8 @@ def train_model(num_training_examples):
         x.append(pages[key][2])
         y.append(val)
 
-    return classification.get_logistic_regression_model(x, y)
-
-
-def test_model(num_testing_examples, model):
+    return [method(x, y) for method in methods]
+def test_models(num_testing_examples, models):
     print 'generating testing data'
 
     training_data = {}
@@ -205,8 +196,7 @@ def test_model(num_testing_examples, model):
             training_data[start_article] = INFINITE_COST
             continue
         num_actions = len(ucs_prob.actions)
-        for j, action in enumerate(ucs_prob.actions):
-            training_data[action] = num_actions - j
+        training_data[start_article] = num_actions
 
     x = []
     y = []
@@ -214,22 +204,36 @@ def test_model(num_testing_examples, model):
         x.append(pages[key][2])
         y.append(val)
 
-    print 'applying model'
-    correct_classifications = classification.apply_logistic_regression_model(x, model)
-    count = float(0)
-    for i in range(len(y)):
-        if y[i] == correct_classifications[i]:
-            count += 1
+    results = {}
+    for i, model in enumerate(models):
+        print 'applying model', i
+        classifications = classification.apply_model(x, model)
+        correct_count = 0
+        wrong_inf_count = 0
+        dist = 0
+        for j in range(len(y)):
+            if y[j] == classifications[j]:
+                correct_count += 1
+            else:
+                if y[j] == INFINITE_COST or classifications[j] == INFINITE_COST:
+                    wrong_inf_count += 1
+                else:
+                    dist += abs(y[j] - classifications[j])
 
-    print count / num_testing_examples, '%'
-    print count, 'of', num_testing_examples
-    return count / num_testing_examples
+        results[model] = (num_testing_examples, correct_count, wrong_inf_count, dist)
+        print type(model)
+        print 100 * float(correct_count) / len(y), '% fully correct'
+        print 'wrong inf.s:', wrong_inf_count
+        print 'dist:', dist
+        print ''
+
+    return results
 
 
 def cluster_data(examples):
-    kmeans_results = kmeans.runkmeans_sklearn(examples)
+    kmeans_results = kmeans.runkmeans_sklearn(examples, [1, 2, 3, 4, 6, 8, 10])
     x = sorted(kmeans_results.keys())
-    y = [kmeans_results[key] for key in x]
+    y = [kmeans_results[key].inertia_ for key in x]
     plt.plot(x, y)
 
     plt.xlabel('Number of Clusters')
@@ -239,10 +243,19 @@ def cluster_data(examples):
     plt.show()
 
 
-model = train_model(500)
-test_model(100, model)
+# methods = [classification.get_linear_regression_model,
+#            classification.get_logistic_regression_model_liblinear,
+#            classification.get_logistic_regression_model_lbfgs_multinomial,
+#            classification.get_logistic_regression_model_newtoncg_multinomial,
+#            classification.get_sgd_model_hinge,
+#            classification.get_sgd_model_perceptron,
+#            classification.get_svm_model
+#            ]
+# models = train_models(1000, methods)
+# test_results = test_models(200, models)
 
-examples = [pages[page][2] for page in pages]
-cluster_data(examples)
+
+# examples = [pages[page][2] for page in pages]
+# cluster_data(examples)
 
 
