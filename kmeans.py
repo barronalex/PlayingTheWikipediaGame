@@ -18,14 +18,16 @@ def runkmeans_sklearn(examples):
 
     d = DictVectorizer()
     X = d.fit_transform(examples)
+    X = csr_matrix.transpose(X)
     print "sparse matrix created"
     results = {}
     for k in range(1, NUM_K_VALUES + 1):
         print "running kmeans with K = ", SPACING*k
         kmeans = KMeans(SPACING*k, init='k-means++', n_init=N_INITS, verbose=True)
         km = kmeans.fit(X)
+        kmname = "kmeans_result_K" + str(SPACING*k)
+        cPickle.dump(results, open(kmname, 'wb'))
         results[SPACING*k] = km
-    cPickle.dump(results, open(fname, 'wb'))
     return results
 
 
