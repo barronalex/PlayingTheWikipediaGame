@@ -1,3 +1,4 @@
+import os.path
 import cPickle
 
 from sklearn.feature_extraction import DictVectorizer
@@ -9,6 +10,11 @@ KMEANS_PICKLE_FNAME = "kmeans_results.pickle"
 
 
 def runkmeans_sklearn(examples):
+    fname = str(NUM_K_VALUES)+'.'+str(SPACING)+'.'+KMEANS_PICKLE_FNAME
+    if os.path.exists(fname):
+        print 'loading from pickle'
+        return cPickle.load(open(fname, 'rb'))
+
     d = DictVectorizer()
     X = d.fit_transform(examples)
     print "sparse matrix created"
@@ -18,7 +24,7 @@ def runkmeans_sklearn(examples):
         kmeans = KMeans(SPACING*k, init='k-means++', n_init=5, verbose=True)
         km = kmeans.fit(X)
         results[SPACING*k] = km
-    cPickle.dump(results, open(KMEANS_PICKLE_FNAME, 'wb'))
+    cPickle.dump(results, open(fname, 'wb'))
     return results
 
 
