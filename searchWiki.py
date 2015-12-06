@@ -11,8 +11,8 @@ import os.path
 import xml.etree.cElementTree as etree
 import cPickle
 
-import numpy
-import matplotlib.pyplot as plot
+import numpy as np
+import matplotlib.pyplot as plt
 
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
@@ -178,7 +178,7 @@ def train_model(num_training_examples):
                 training_data[action] = num_actions - j
 
         print 'pickling for future use'
-        cPickle.dump(pages, open(TRAINING_DATA_PICKLE_FNAME, 'wb'))
+        cPickle.dump(training_data, open(TRAINING_DATA_PICKLE_FNAME, 'wb'))
 
     x = []
     y = []
@@ -227,7 +227,16 @@ def test_model(num_testing_examples, model):
 
 
 def cluster_data(examples):
-    kmeansresults = kmeans.runkmeans_sklearn(examples)
+    kmeans_results = kmeans.runkmeans_sklearn(examples)
+    x = sorted(kmeans_results.keys())
+    y = [kmeans_results[key] for key in x]
+    plt.plot(x, y)
+
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Loss')
+    plt.title('K-means Clustering Loss vs. Number of Clusters')
+    plt.savefig("kmeans_cluster_num_graph.png")
+    plt.show()
 
 
 model = train_model(500)

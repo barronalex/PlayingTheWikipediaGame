@@ -9,12 +9,14 @@ def get_logistic_regression_model(x, y):
                                              verbose=True)
     d = DictVectorizer()
     t_x = d.fit_transform(x)
+    print 'starting the model'
     logreg.fit(t_x, y)
-    print "logistic model created"
-    return logreg
+    print 'logistic model created'
+    return d, logreg
 
 
 def apply_logistic_regression_model(x, model):
-    # t_x = model.transform(x)
-    return model.predict(x)
+    d, logreg = model
+    t_x = d.transform(x)
+    return logreg.predict(t_x)
 
