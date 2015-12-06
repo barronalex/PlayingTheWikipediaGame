@@ -1,10 +1,12 @@
 import random
 import sklearn
-
+from sklearn.feature_extraction import DictVectorizer
 
 def runkmeans_sklearn(examples, K):
+    d = DictVectorizer()
+    X = d.fit_transform(examples)
     kmeans = sklearn.cluster.KMeans(K, init='k-means++', n_init=1, verbose=True)
-    kmeans.fit(examples)
+    kmeans.fit(X)
 
 
 def runkmeans(examples, K, maxIters):

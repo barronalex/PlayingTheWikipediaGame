@@ -149,4 +149,4 @@ assignments = []
 for page in pages:
     assignments.append((page,count))
     count += 1
-kmeans.runkmeans(examples,10, 300)
+#kmeans.runkmeans(examples,10, 50)
