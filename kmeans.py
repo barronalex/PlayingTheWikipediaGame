@@ -1,11 +1,13 @@
 import random
 import sklearn
 from sklearn.feature_extraction import DictVectorizer
+from sklearn.cluster import KMeans
 
 def runkmeans_sklearn(examples, K):
+    kmeans = KMeans(K, init='k-means++', n_init=1, verbose=True)
     d = DictVectorizer()
     X = d.fit_transform(examples)
-    kmeans = sklearn.cluster.KMeans(K, init='k-means++', n_init=1, verbose=True)
+    print "sparse matrix created"
     kmeans.fit(X)
 
 
