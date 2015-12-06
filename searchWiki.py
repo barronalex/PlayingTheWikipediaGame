@@ -180,16 +180,8 @@ def learn_weights(num_training_examples):
 
 
 def cluster_data():
-    examples = [pages[page][2] for page in pages]
+   
+    kmeansresults = kmeans.runkmeans_sklearn(examples)
 
-    count = 0
-    assignments = []
-    for page in pages:
-        assignments.append((page, count))
-        count += 1
-
-    kmeans.runkmeans_sklearn(examples, 10)
-
-
-cluster_data()
+examples = [pages[page][2] for page in pages]
 
