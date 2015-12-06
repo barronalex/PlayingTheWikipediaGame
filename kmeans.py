@@ -1,9 +1,10 @@
 import random
-import sklearn
+
+from sklearn.cluster import KMeans
 
 
 def runkmeans_sklearn(examples, K):
-    kmeans = sklearn.cluster.KMeans(K, init='k-means++', n_init=1, verbose=True)
+    kmeans = KMeans(K, init='k-means++', n_init=1, verbose=True)
     kmeans.fit(examples)
 
 
