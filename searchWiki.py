@@ -168,8 +168,12 @@ def learn_weights(num_training_examples):
 
     weights = []
     for i in range(6):
-        c_training_data = {pages[key][2]: val == i + 1 for key, val in training_data}
-        weight = classification.logistic_regression(c_training_data)
+        x = []
+        y = []
+        for key, val in training_data:
+            x.append(pages[key][2])
+            y.append(val == i + 1)
+        weight = classification.logistic_regression(x, y)
         weights.append(weight)
 
     return weights
@@ -177,6 +181,7 @@ def learn_weights(num_training_examples):
 
 def cluster_data():
     examples = [pages[page][2] for page in pages]
+
     count = 0
     assignments = []
     for page in pages:
@@ -187,3 +192,4 @@ def cluster_data():
 
 
 cluster_data()
+
