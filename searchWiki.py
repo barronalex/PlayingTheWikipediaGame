@@ -104,7 +104,7 @@ def extract_features(text, links):
 
     unique_tokens_no_sw = unique_tokens - stop_words
 
-    features = {token: 1 for token in unique_tokens_no_sw}
+    features = {token: float(1) for token in unique_tokens_no_sw}
     features['NUM_WORDS'] = len(tokens)
     features['NUM_LINKS'] = len(links)
 
