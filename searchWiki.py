@@ -33,7 +33,7 @@ stemmer = SnowballStemmer('english')
 
 
 # get the tree from the XML file
-def init_tree():
+def init_pages():
     print 'starting'
     if os.path.exists(PICKLE_FNAME):
         print 'loading from pickle'
@@ -52,10 +52,24 @@ def init_tree():
                 pages[title.text] = (text.text, None)
         print 'dumping to pickle'
         cPickle.dump(pages, open(PICKLE_FNAME, 'wb'))
+        setUpLinksAndFeatures()
+
     print 'wikipedia loaded'
 
     return pages
 
+def setUpLinksAndFeatures():
+    print 'total articles:', len(pages)
+    for i, (page, value) in enumerate(pages.iteritems()):
+        val = value[0]
+        links = get_links_from_text(pages, val)
+        if not isinstance(val, basestring):
+            features = {}
+        else:
+            features = extract_features(val, links)
+            if i % 1000 == 0:
+                print 'i = ', i
+        pages[page] = (val, links, features)
 
 def get_links_from_text(pages, text):
     links = []
@@ -76,7 +90,6 @@ def get_links_from_text(pages, text):
         links.append(potential_link)
     return links
 
-
 def extract_features(text, links):
     tokens = tokenizer.tokenize(text.lower())
 
@@ -93,21 +106,10 @@ def extract_features(text, links):
     return features
 
 
-# convert the page array to a tuple (article text, links, features)
-pages = init_tree()
-print 'total articles:', len(pages)
-for i, (page, value) in enumerate(pages.iteritems()):
-    val = value[0]
-    links = get_links_from_text(pages, val)
-    if not isinstance(val, basestring):
-        features = {}
-    else:
-        features = extract_features(val, links)
-        if i % 1000 == 0:
-            print 'i = ', i
-
-    pages[page] = (val, links, features)
+# set up pages dictionary which contains {page title: (page text, links from page, feature dict)}
+pages = init_pages()
 print 'pages is setup'
+
 
 
 def perform_ucs():
@@ -141,5 +143,10 @@ def perform_ucs():
     print 'av cost: ', float(total_cost)/num_pith_paths
     print 'percent with paths: ', float(num_pith_paths), '%'
     print 'av time: ', float(total_time)/100
-
-kmeans.runkmeans(pages, 10, 300)
+examples = [pages[page][2] for page in pages]
+count = 0
+assignments = []
+for page in pages:
+    assignments.append((page,count))
+    count += 1
+kmeans.runkmeans(examples,10, 300)
