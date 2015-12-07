@@ -84,13 +84,39 @@ def graph_pca(examples, pages):
 def graph_entire_2D_pca(components, pages):
     x = components[0,:]
     y = components[1,:]
-    years = []
+    dates = []
     for i,state in enumerate(pages):
         if re.match(r"[0-90-90-90-9]", state) is not None:
-            years.append(i)
-    plt.scatter(x,y)
-    for index in years:
+            dates.append(i)
+        if re.search(r"(January|February|March|April|May|June|July|August|September|October|November|December)", state) is not None:
+            dates.append(i)
+        if re.search(r"(List)", state) is not None:
+            print i
+            dates.append(i)
+    for index in dates:
         plt.scatter([components[0,index]],[components[1,index]],s=200,c='r')
+    plt.scatter(x,y)
+    plt.xlabel("pca component 1")
+    plt.ylabel("pca component 2")
+    plt.title("2D pca with Dates Highlighted")
+    plt.show(block = False)
+    
+def graph_entire_3D_pca(components, pages):
+    dates = []
+    x = components[0,:]
+    y = components[1,:]
+    z = components[2,:]
+    for j in range(0,len(x)):
+        if random.random() < 0.5:
+            x[j] *= -1
+        if random.random() < 0.5:
+            y[j] *= -1
+        if random.random() < 0.5:
+            z[j] *= -1
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(x,y,z)
+    ax.axis('off')
     plt.show(block = False)
 
 
