@@ -14,7 +14,7 @@ PCA_PICKLE_FNAME = 'pca_components.pickle'
 GOAL_ARTICLE = 'Stanford'
 NUM_EXAMPLE_PATHS = 100
 EXAMPLE_DENSITIES_FNAME = 'example_densities.pickle'
-NUM_COMPONENTS = 3
+NUM_COMPONENTS = 2
 
 def run_pca(examples):
     svd = TruncatedSVD(n_components=NUM_COMPONENTS, random_state=42)
@@ -84,6 +84,11 @@ def graph_pca(examples, pages):
 def graph_entire_2D_pca(components, pages):
     x = components[0,:]
     y = components[1,:]
+    for j in range(0,len(x)):
+        if random.random() < 0.5:
+            x[j] *= -1
+        if random.random() < 0.5:
+            y[j] *= -1
     dates = []
     for i,state in enumerate(pages):
         if re.match(r"[0-90-90-90-9]", state) is not None:
