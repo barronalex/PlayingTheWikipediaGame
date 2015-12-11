@@ -22,14 +22,15 @@ from nltk.stem.snowball import SnowballStemmer
 WIKIPEDIA_XML_FNAME = 'simplewiki-latest-pages-articles.xml'
 PICKLE_FNAME = 'pages.pickle'
 TRAINING_DATA_PICKLE_FNAME = 'training_data.pickle'
+MODEL_PICKLE_FNAME = 'model.pickle'
 
 MEDIA_WIKI_PREFIX = '{http://www.mediawiki.org/xml/export-0.10/}'
 REDIRECT_STR1 = '#REDIRECT'
 REDIRECT_STR2 = '#redirect'
 
-INFINITE_COST = 10000
-
 GOAL_ARTICLE = 'Stanford'
+NUM_CLUSTERS = 4
+INFINITE_COST = 10000
 
 
 stop_words = set(stopwords.words('english'))
@@ -55,9 +56,10 @@ def init_pages():
             text = revision.find(MEDIA_WIKI_PREFIX + 'text')
             if text is not None and title is not None:
                 pages[title.text] = (text.text, None)
+        print 'setting up links and pages'
+        set_up_links_and_features(pages)
         print 'dumping to pickle'
         cPickle.dump(pages, open(PICKLE_FNAME, 'wb'))
-        set_up_links_and_features()
 
     print 'wikipedia loaded'
 
@@ -94,8 +96,10 @@ def extract_features(text, links):
     features['NUM_LINKS'] = len(links)
 
     return features
-def set_up_links_and_features():
+def set_up_links_and_features(pages):
     print 'total articles:', len(pages)
+    ref = {}
+    examples = []
     for i, (page, value) in enumerate(pages.iteritems()):
         val = value[0]
         links = get_links_from_text(pages, val)
@@ -106,6 +110,16 @@ def set_up_links_and_features():
             if i % 1000 == 0:
                 print 'i = ', i
         pages[page] = (val, links, features)
+        ref[page] = i
+        examples.append(features)
+
+    kmeans_results = kmeans.runkmeans_sklearn(examples, [NUM_CLUSTERS])
+    labs = kmeans_results[NUM_CLUSTERS].labels_
+    for page, value in pages.iteritems():
+        features = value[2]
+        cluster = labs[ref[page]]
+        for i in range(NUM_CLUSTERS):
+            features['IN_CLUSTER_'+str(i)] = 1 if cluster == i else 0
 
 
 # set up pages dictionary which contains {page title: (page text, links from page, feature dict)}
@@ -113,37 +127,40 @@ pages = init_pages()
 print 'pages is setup'
 
 
-def test_ucs(num_tests):
+def run_ucs(num_tests, heuristic=None):
     total_states_explored = 0
     total_cost = 0
-    num_pith_paths = 0
+    num_with_paths = 0
     total_time = 0
 
     for i in range(num_tests):
+        start_time = datetime.datetime.now()
         start_article = random.sample(pages, 1)[0]
         print 'start article: ', start_article
         print 'goal article: ', GOAL_ARTICLE
-        start_time = datetime.datetime.now()
-        search_prob = ucs.SearchProblem(pages, start_article, GOAL_ARTICLE)
+        search_prob = ucs.SearchProblem(pages, start_article, GOAL_ARTICLE, heuristic)
         ucs_prob = ucs.UniformCostSearch(1)
         ucs_prob.solve(search_prob)
         end_time = datetime.datetime.now()
-        total_time += int((end_time - start_time).microseconds)
         total_states_explored += ucs_prob.numStatesExplored
         if ucs_prob.totalCost is None:
             continue
-        total_cost += ucs_prob.totalCost
-        num_pith_paths += 1
+        total_cost += len(ucs_prob.actions)
+        num_with_paths += 1
 
+        total_time += int((end_time - start_time).microseconds)
+
+        print 'av states explored:', float(total_states_explored)/(i+1)
+        print 'av cost:', float(total_cost)/num_with_paths
+        print 'percent with paths:', 100*float(num_with_paths)/(i+1), '%'
+        print 'av time:', float(total_time)/(i+1)
         print ''
 
-    print 'av states explored: ', float(total_states_explored)/100
-    print 'av cost: ', float(total_cost)/num_pith_paths
-    print 'percent with paths: ', float(num_pith_paths), '%'
-    print 'av time: ', float(total_time)/100
+    return float(total_states_explored)/num_tests, float(total_cost)/num_with_paths, float(num_with_paths), \
+        float(total_time)/num_tests
 
 
-def train_models(num_training_examples, methods):
+def train_models(num_training_examples, method_names, methods):
     print 'generating training data'
 
     fname = str(num_training_examples) + '.' + TRAINING_DATA_PICKLE_FNAME
@@ -179,7 +196,19 @@ def train_models(num_training_examples, methods):
         x.append(pages[key][2])
         y.append(val)
 
-    return [method(x, y) for method in methods]
+    result = []
+    for i, method in enumerate(methods):
+        fname = method_names[i].lower().replace(' ', '_') + '.' + MODEL_PICKLE_FNAME
+        if os.path.exists(fname):
+            print 'loading model from pickle'
+            result.append(cPickle.load(open(fname, 'rb')))
+        else:
+            mod = method(x, y)
+            result.append(mod)
+            print 'pickling for future use'
+            cPickle.dump(mod, open(fname, 'wb'))
+
+    return result
 def test_models(num_testing_examples, models):
     print 'generating testing data'
 
@@ -209,9 +238,13 @@ def test_models(num_testing_examples, models):
         print 'applying model', i
         classifications = classification.apply_model(x, model)
         correct_count = 0
+        reachable_count = 0
         wrong_inf_count = 0
         dist = 0
         for j in range(len(y)):
+            if y[j] == INFINITE_COST:
+                continue
+            reachable_count += 1
             if y[j] == classifications[j]:
                 correct_count += 1
             else:
@@ -220,42 +253,49 @@ def test_models(num_testing_examples, models):
                 else:
                     dist += abs(y[j] - classifications[j])
 
-        results[model] = (num_testing_examples, correct_count, wrong_inf_count, dist)
+        results[model] = (correct_count, dist, wrong_inf_count, reachable_count)
         print type(model)
-        print 100 * float(correct_count) / len(y), '% fully correct'
-        print 'wrong inf.s:', wrong_inf_count
-        print 'dist:', dist
+        print 'fully correct', 100 * float(correct_count) / reachable_count, '%'
+        print 'dist:', float(dist) / reachable_count
+        print 'wrong inf.s:', 100 * float(wrong_inf_count) / reachable_count, '%'
         print ''
 
     return results
+def try_models():
+    method_names = ['One vs. Rest Logistic Regression',
+                    'Multinomial Logistic Regression',
+                    'SGD with Hinge Loss',
+                    'SGD with Percepton Loss',
+                    'SVM with Squared Hinge Loss']
+    methods = [classification.get_logistic_regression_model_liblinear,
+               classification.get_logistic_regression_model_lbfgs_multinomial,
+               classification.get_sgd_model_hinge,
+               classification.get_sgd_model_perceptron,
+               classification.get_svm_model]
+    models = train_models(1000, method_names, methods)
+    test_results = test_models(200, models)
 
 
-def cluster_data(examples):
-    kmeans_results = kmeans.runkmeans_sklearn(examples, [1, 2, 3, 4, 6, 8, 10])
+def cluster_data():
+    examples = [pages[page][2] for page in pages]
+    kmeans_results = kmeans.runkmeans_sklearn(examples, range(1, 16))
     x = sorted(kmeans_results.keys())
     y = [kmeans_results[key].inertia_ for key in x]
     plt.plot(x, y)
 
     plt.xlabel('Number of Clusters')
     plt.ylabel('Loss')
-    plt.title('K-means Clustering Loss vs. Number of Clusters')
-    plt.savefig("kmeans_cluster_num_graph.png")
+    plt.title('K-means Clustering\nLoss vs. Number of Clusters')
+    plt.savefig('kmeans_cluster_num_graph.png')
     plt.show()
 
 
-# methods = [classification.get_linear_regression_model,
-#            classification.get_logistic_regression_model_liblinear,
-#            classification.get_logistic_regression_model_lbfgs_multinomial,
-#            classification.get_logistic_regression_model_newtoncg_multinomial,
-#            classification.get_sgd_model_hinge,
-#            classification.get_sgd_model_perceptron,
-#            classification.get_svm_model
-#            ]
-# models = train_models(1000, methods)
-# test_results = test_models(200, models)
+def test_heuristic():
+    model = train_models(2000, ['heuristic'], [classification.get_logistic_regression_model_liblinear])[0]
 
+    def heuristic(link):
+        return classification.apply_model([pages[link][2]], model)
+    run_ucs(100, heuristic=heuristic)
 
-# examples = [pages[page][2] for page in pages]
-# cluster_data(examples)
 
 

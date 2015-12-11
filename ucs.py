@@ -47,9 +47,13 @@ class AStarSearcher(AStarVisitor):
 
     
 
-class SearchProblem():
-    def __init__(self, pages, start_article, goal_article):
+class SearchProblem:
+    def __init__(self, pages, start_article, goal_article, heuristic=None):
         self.pages = pages
+        if heuristic is not None:
+            self.heuristic = heuristic
+        else:
+            self.heuristic = lambda x: 0
         self.start_article = start_article
         self.goal_article = goal_article
 
@@ -61,8 +65,9 @@ class SearchProblem():
 
     def succAndCost(self, state):
         links = self.pages[state][1]
-        result =  [(link, link, 1) for link in links]
+        result = [(link, link, 1 + self.heuristic(link)) for link in links]
         return result
+
 
 class SearchAlgorithm:
     def solve(self, problem): raise NotImplementedError("Override me")
@@ -136,7 +141,7 @@ class PriorityQueue:
     # Return whether the priority queue was updated.
     def update(self, state, newPriority):
         oldPriority = self.priorities.get(state)
-        if oldPriority == None or newPriority < oldPriority:
+        if oldPriority is None or newPriority < oldPriority:
             self.priorities[state] = newPriority
             heapq.heappush(self.heap, (newPriority, state))
             return True
