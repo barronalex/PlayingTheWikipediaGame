@@ -2,6 +2,51 @@ import heapq
 import re
 
 
+
+from graph_tool.all import *
+
+g = Graph(directed = False)
+pageVertices = {}
+weights = g.new_edge_property('int') 
+
+def make_Graph(pages):
+    for page in pages:
+        nv = g.add_vertex()
+        pageVertices[nv] = page
+        pageVertices[page] = nv
+    for j, page in enumerate(pages):
+        print j
+        for link in pages[page][1]:
+            g.add_edge(pageVertices[page], pageVertices[link])
+    print 'graph created'
+    for e in g.edges():
+        weights[e] = 1     
+    print 'graph set up'
+
+def search_Graph(start_article, g, pageVertices, weights):
+    target = g.vertex(pageVertices['Stanford'])
+    searcher = AStarSearcher(target)
+    dist, pred = astar_search(g, g.vertex(pageVertices[start_article]), weights,
+                              searcher,
+                              heuristic=lambda v: 0)
+    return dist, pred, searcher.numExplored
+
+
+class AStarSearcher(AStarVisitor):
+
+    def __init__(self, target):
+        self.target = target
+        self.numExplored = 0
+
+    def discover_vertex(self, u):
+        self.numExplored += 1
+        
+    def edge_relaxed(self, e):
+        if e.target() == self.target:
+            raise StopSearch()
+
+    
+
 class SearchProblem():
     def __init__(self, pages, start_article, goal_article):
         self.pages = pages
@@ -18,14 +63,6 @@ class SearchProblem():
         links = self.pages[state][1]
         result =  [(link, link, 1) for link in links]
         return result
-
-def extractFeatures(text):
-    featureVec = {}
-    tokens = re.findall(r"\w+", text)
-    for token in tokens:
-        featureVec[token] = 1
-    return featureVec
-
 
 class SearchAlgorithm:
     def solve(self, problem): raise NotImplementedError("Override me")
