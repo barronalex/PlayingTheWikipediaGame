@@ -123,38 +123,76 @@ def set_up_links_and_features(pages):
 
 
 # set up pages dictionary which contains {page title: (page text, links from page, feature dict)}
+pages = {}
 pages = init_pages()
 print 'pages is setup'
+g, w, pv = ucs.make_Graph(pages)
 
+def greedy_search(pages):
+    model = train_models(100, ['heuristic'], [classification.get_logistic_regression_model_liblinear])[0]
+    total_states_explored = 0
+    num_with_paths = 0
+    total_time = 0
+    for i in range(100):
+        start_time = datetime.datetime.now()
+        current_article = random.sample(pages, 1)[0]
+        print 'start article: ', current_article
+        print 'goal article: ', GOAL_ARTICLE
+        for j in range(10):
+            links = pages[current_article][1]
+            min_cost = 1000000
+            for link in links:
+                cost = classification.apply_model([pages[link][2]], model)
+                if cost < min_cost:
+                    print 'current min cost: ', min_cost
+                    min_cost = cost
+                    current_article = link
+            if current_article == GOAL_ARTICLE:
+                break
+        end_time = datetime.datetime.now()
+        total_states_explored += j
+        print 'dist: ',j 
+        if j == 9:
+            continue 
+        num_with_paths += 1
 
-def run_ucs(num_tests, heuristic=None):
+        total_time += int((end_time - start_time).microseconds)
+
+    print 'av states explored:', float(total_states_explored)/(i+1)
+    print 'percent with paths:', 100*float(num_with_paths)/(i+1), '%'
+    print 'av time:', float(total_time)/(i+1)
+
+def run_ucs(num_tests,g,w,pv, heuristic=None):
     total_states_explored = 0
     total_cost = 0
     num_with_paths = 0
     total_time = 0
-
+    model = train_models(100, ['heuristic'], [classification.get_logistic_regression_model_liblinear])[0]
     for i in range(num_tests):
         start_time = datetime.datetime.now()
         start_article = random.sample(pages, 1)[0]
         print 'start article: ', start_article
         print 'goal article: ', GOAL_ARTICLE
-        search_prob = ucs.SearchProblem(pages, start_article, GOAL_ARTICLE, heuristic)
-        ucs_prob = ucs.UniformCostSearch(1)
-        ucs_prob.solve(search_prob)
+        def h(v):
+            guess = 1000000*classification.apply_model([pages[pv[v]][2]], model)
+            #print guess
+            return guess
+        dist, pred, numExplored = ucs.search_Graph(start_article, g, w, pv, h) 
         end_time = datetime.datetime.now()
-        total_states_explored += ucs_prob.numStatesExplored
-        if ucs_prob.totalCost is None:
+        total_states_explored += numExplored
+        print dist
+        if dist > 10:
             continue
-        total_cost += len(ucs_prob.actions)
+        total_cost += dist 
         num_with_paths += 1
 
         total_time += int((end_time - start_time).microseconds)
 
-        print 'av states explored:', float(total_states_explored)/(i+1)
-        print 'av cost:', float(total_cost)/num_with_paths
-        print 'percent with paths:', 100*float(num_with_paths)/(i+1), '%'
-        print 'av time:', float(total_time)/(i+1)
-        print ''
+    print 'av states explored:', float(total_states_explored)/(i+1)
+    print 'av cost:', float(total_cost)/num_with_paths
+    print 'percent with paths:', 100*float(num_with_paths)/(i+1), '%'
+    print 'av time:', float(total_time)/(i+1)
+    print ''
 
     return float(total_states_explored)/num_tests, float(total_cost)/num_with_paths, float(num_with_paths), \
         float(total_time)/num_tests

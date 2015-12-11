@@ -5,11 +5,12 @@ import re
 
 from graph_tool.all import *
 
-g = Graph(directed = False)
-pageVertices = {}
-weights = g.new_edge_property('int') 
+
 
 def make_Graph(pages):
+    g = Graph(directed = False)
+    pageVertices = {}
+    weights = g.new_edge_property('int') 
     for page in pages:
         nv = g.add_vertex()
         pageVertices[nv] = page
@@ -20,16 +21,17 @@ def make_Graph(pages):
             g.add_edge(pageVertices[page], pageVertices[link])
     print 'graph created'
     for e in g.edges():
-        weights[e] = 1     
+        weights[e] = 1 
     print 'graph set up'
+    return g, weights, pageVertices
 
-def search_Graph(start_article, g, pageVertices, weights):
+def search_Graph(start_article, g, weights, pageVertices, h):
     target = g.vertex(pageVertices['Stanford'])
     searcher = AStarSearcher(target)
     dist, pred = astar_search(g, g.vertex(pageVertices[start_article]), weights,
                               searcher,
-                              heuristic=lambda v: 0)
-    return dist, pred, searcher.numExplored
+                              heuristic=lambda v: h(v))
+    return dist[g.vertex(pageVertices['Stanford'])], pred, searcher.numExplored
 
 
 class AStarSearcher(AStarVisitor):
